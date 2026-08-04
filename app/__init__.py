@@ -27,27 +27,6 @@ def normalize_language(language: str | None, supported_languages: tuple[str, ...
     return "en"
 
 
-def normalize_redirect_target(target: str | None, fallback: str) -> str:
-    """Allow redirects only to local application paths."""
-
-    if not target:
-        return fallback
-
-    normalized_target = target.replace("\\", "")
-    parsed_target = urlsplit(normalized_target)
-    if parsed_target.scheme or parsed_target.netloc:
-        return fallback
-    if not parsed_target.path.startswith("/") or parsed_target.path.startswith("//"):
-        return fallback
-
-    safe_target = parsed_target.path
-    if parsed_target.query:
-        safe_target = f"{safe_target}?{parsed_target.query}"
-    if parsed_target.fragment:
-        safe_target = f"{safe_target}#{parsed_target.fragment}"
-    return safe_target
-
-
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Application factory."""
 
@@ -92,7 +71,7 @@ def register_hooks(app: Flask) -> None:
     @app.before_request
     @instrument("load_request_context")
     def load_request_context() -> None:
-        language = request.cookies.get(app.config["LANGUAGE_COOKIE_NAME"], "en")
+        language = session.get("language", "en")
         session_user = session.get("current_user")
         current_user = user_store.get_user(session_user) if session_user else None
         if current_user and current_user.get("preferred_language"):
@@ -134,7 +113,7 @@ def register_hooks(app: Flask) -> None:
             "language_names": LANGUAGE_NAMES,
             "current_language": g.get("language", "en"),
             "csrf_token": g.get("csrf_token", get_csrf_token()),
-            "remembered_user": request.cookies.get(app.config["REMEMBER_COOKIE_NAME"], ""),
+            "remembered_user": session.get("remembered_user", ""),
             "current_path": request.path,
             "current_user": g.get("current_user"),
             "is_admin": g.get("is_admin", False),
@@ -151,7 +130,7 @@ def register_routes(app: Flask) -> None:
     @app.get("/")
     @instrument("welcome")
     def welcome() -> str:
-        remembered_user = request.cookies.get(app.config["REMEMBER_COOKIE_NAME"])
+        remembered_user = session.get("remembered_user")
         return render_template("welcome.html", remembered_user=remembered_user)
 
     @app.route("/login", methods=["GET", "POST"])
@@ -170,7 +149,7 @@ def register_routes(app: Flask) -> None:
                 session["current_user"] = user["username"]
                 destination = determine_post_login_route(user_store, user)
                 response = make_response(redirect(url_for(destination)))
-                set_preference_cookies(app, response, user.get("preferred_language") or g.language, user["display_name"])
+                set_user_preferences(app, user.get("preferred_language") or g.language, user["display_name"])
                 flash(g.translations["sign_in_cta"], "success")
                 return response
         return render_template("login.html")
@@ -181,9 +160,8 @@ def register_routes(app: Flask) -> None:
         if not validate_csrf(request.form.get("csrf_token")):
             return make_response("Invalid CSRF token", 400)
         session.pop("current_user", None)
-        response = make_response(redirect(url_for("welcome")))
-        response.delete_cookie(app.config["REMEMBER_COOKIE_NAME"])
-        return response
+        session.pop("remembered_user", None)
+        return redirect(url_for("welcome"))
 
     @app.route("/create-account-access", methods=["GET", "POST"])
     @instrument("access_code")
@@ -223,7 +201,7 @@ def register_routes(app: Flask) -> None:
                 session.pop("invite_code_verified", None)
                 session["current_user"] = user["username"]
                 response = make_response(redirect(url_for("user_info")))
-                set_preference_cookies(app, response, g.language, username)
+                set_user_preferences(app, g.language, username)
                 flash(g.translations["account_created"], "success")
                 return response
 
@@ -256,9 +234,8 @@ def register_routes(app: Flask) -> None:
                         preferred_language,
                     )
                     response = make_response(redirect(url_for("accounts")))
-                    set_preference_cookies(
+                    set_user_preferences(
                         app,
-                        response,
                         preferred_language or g.language,
                         current_user["display_name"],
                     )
@@ -278,8 +255,8 @@ def register_routes(app: Flask) -> None:
                 else:
                     user_store.delete_user(current_user["username"])
                     session.pop("current_user", None)
+                    session.pop("remembered_user", None)
                     response = make_response(redirect(url_for("welcome")))
-                    response.delete_cookie(app.config["REMEMBER_COOKIE_NAME"])
                     flash(g.translations["user_deleted"], "success")
                     return response
 
@@ -446,19 +423,17 @@ def register_routes(app: Flask) -> None:
                 current_user.get("email", ""),
                 language,
             )
-        next_path = normalize_redirect_target(
-            request.form.get("next_path"),
-            url_for("welcome"),
-        )
+        next_path = request.form.get("next_path", "")
+        parsed_target = urlsplit(next_path)
+        if "\\" in next_path or (
+            parsed_target.scheme
+            or parsed_target.netloc
+            or not parsed_target.path.startswith("/")
+            or parsed_target.path.startswith("//")
+        ):
+            next_path = url_for("welcome")
         response = make_response(redirect(next_path))
-        response.set_cookie(
-            app.config["LANGUAGE_COOKIE_NAME"],
-            language,
-            max_age=60 * 60 * 24 * 365,
-            httponly=True,
-            samesite="Lax",
-            secure=app.config["SESSION_COOKIE_SECURE"],
-        )
+        set_user_preferences(app, language)
         return response
 
     @app.get("/metrics")
@@ -662,25 +637,11 @@ def format_account_display(account: dict[str, str]) -> str:
     return f"{account.get('account_name', '')} ({account.get('alliance', '')})"
 
 
-@instrument("set_preference_cookies")
-def set_preference_cookies(app: Flask, response: Response, language: str, username: str) -> None:
-    """Set persistent user preference cookies."""
+@instrument("set_user_preferences")
+def set_user_preferences(app: Flask, language: str, username: str | None = None) -> None:
+    """Store validated preferences in Flask's signed, persistent session."""
 
-    max_age = 60 * 60 * 24 * 365
-    safe_language = normalize_language(language, app.config["SUPPORTED_LANGUAGES"])
-    response.set_cookie(
-        app.config["LANGUAGE_COOKIE_NAME"],
-        safe_language,
-        max_age=max_age,
-        httponly=True,
-        samesite="Lax",
-        secure=app.config["SESSION_COOKIE_SECURE"],
-    )
-    response.set_cookie(
-        app.config["REMEMBER_COOKIE_NAME"],
-        username,
-        max_age=max_age,
-        httponly=True,
-        samesite="Lax",
-        secure=app.config["SESSION_COOKIE_SECURE"],
-    )
+    session.permanent = True
+    session["language"] = normalize_language(language, app.config["SUPPORTED_LANGUAGES"])
+    if username:
+        session["remembered_user"] = username

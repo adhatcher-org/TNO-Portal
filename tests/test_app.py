@@ -110,7 +110,8 @@ def test_language_preference_is_stored(client) -> None:
     )
 
     assert response.status_code == 302
-    assert "tno_language=fr" in response.headers["Set-Cookie"]
+    with client.session_transaction() as session:
+        assert session["language"] == "fr"
 
 
 @pytest.mark.parametrize(
@@ -170,7 +171,8 @@ def test_can_create_account_and_redirect_to_user_info(client) -> None:
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/user-info")
-    assert any("tno_username=PlayerOne" in cookie for cookie in response.headers.getlist("Set-Cookie"))
+    with client.session_transaction() as session:
+        assert session["remembered_user"] == "PlayerOne"
 
 
 def test_login_redirects_to_user_info_until_profile_is_completed(client) -> None:
