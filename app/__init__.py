@@ -33,12 +33,19 @@ def normalize_redirect_target(target: str | None, fallback: str) -> str:
     if not target:
         return fallback
 
-    parsed_target = urlsplit(target)
+    normalized_target = target.replace("\\", "")
+    parsed_target = urlsplit(normalized_target)
     if parsed_target.scheme or parsed_target.netloc:
         return fallback
     if not parsed_target.path.startswith("/") or parsed_target.path.startswith("//"):
         return fallback
-    return target
+
+    safe_target = parsed_target.path
+    if parsed_target.query:
+        safe_target = f"{safe_target}?{parsed_target.query}"
+    if parsed_target.fragment:
+        safe_target = f"{safe_target}#{parsed_target.fragment}"
+    return safe_target
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
