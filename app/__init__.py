@@ -6,8 +6,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
-
 from flask import Flask, Response, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for
 
 from app.config import Config
@@ -17,6 +15,19 @@ from app.storage import DEFAULT_ALLIANCES, DEFAULT_ACCOUNT_TYPES, UserStore, cre
 from app.translations import LANGUAGE_NAMES, TRANSLATIONS
 
 ACCOUNT_TYPE_SORT_ORDER = {"Main": 0, "Secondary": 1, "Farm": 2}
+LANGUAGE_RETURN_ENDPOINTS = {
+    "/": "welcome",
+    "/login": "login",
+    "/create-account-access": "access_code",
+    "/create-account": "create_account",
+    "/user-info": "user_info",
+    "/accounts": "accounts",
+    "/alliance-users": "alliance_users",
+    "/admin": "admin_home",
+    "/admin/account-types": "admin_account_types",
+    "/admin/alliances": "admin_alliances",
+    "/admin/users": "admin_users",
+}
 
 
 def normalize_language(language: str | None, supported_languages: tuple[str, ...]) -> str:
@@ -423,16 +434,8 @@ def register_routes(app: Flask) -> None:
                 current_user.get("email", ""),
                 language,
             )
-        next_path = request.form.get("next_path", "")
-        parsed_target = urlsplit(next_path)
-        if "\\" in next_path or (
-            parsed_target.scheme
-            or parsed_target.netloc
-            or not parsed_target.path.startswith("/")
-            or parsed_target.path.startswith("//")
-        ):
-            next_path = url_for("welcome")
-        response = make_response(redirect(next_path))
+        endpoint = LANGUAGE_RETURN_ENDPOINTS.get(request.form.get("next_path"), "welcome")
+        response = make_response(redirect(url_for(endpoint)))
         set_user_preferences(app, language)
         return response
 

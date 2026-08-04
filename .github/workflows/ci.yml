@@ -7,35 +7,20 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  test-and-build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.0
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install Poetry
-        run: python -m pip install "poetry==2.3.2"
-
-      - name: Configure Poetry
-        run: poetry config virtualenvs.in-project true
-
-      - name: Install dependencies
-        run: poetry install
-
-      - name: Run tests
-        run: make test
-
-      - name: Run coverage
-        run: make coverage
-
-      - name: Build Docker image
-        run: make build
+  ci:
+    uses: adhatcher-org/shared-workflows/.github/workflows/app-ci.yml@8189d4131e5b4b78d9b6f947e4a3bc8a28d4fdc8 # v1.0.1
+    with:
+      python-version: "3.12"
+      dependency-manager: poetry
+      run-lint: false
+      run-typecheck: false
+      run-tests: true
+      run-coverage: true
+      run-security: false
+      run-docker-build: true
