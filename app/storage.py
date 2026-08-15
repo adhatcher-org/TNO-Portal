@@ -18,7 +18,9 @@ DEFAULT_ALLIANCES = ["TNO", "TCF", "TON", "R&S"]
 class UserStore:
     """Persistence wrapper for users, accounts, and admin settings."""
 
-    def __init__(self, users_collection: Collection, settings_collection: Collection) -> None:
+    def __init__(
+        self, users_collection: Collection, settings_collection: Collection
+    ) -> None:
         self._users = users_collection
         self._settings = settings_collection
 
@@ -28,7 +30,9 @@ class UserStore:
 
         if not username:
             return False
-        return self._users.find_one({"username": username.lower()}, {"_id": 1}) is not None
+        return (
+            self._users.find_one({"username": username.lower()}, {"_id": 1}) is not None
+        )
 
     @instrument("user_store_create_user")
     def create_user(self, username: str, password_hash: str) -> dict[str, Any]:
@@ -85,7 +89,9 @@ class UserStore:
     def update_password(self, username: str, password_hash: str) -> None:
         """Update a user's password hash."""
 
-        self._users.update_one({"username": username.lower()}, {"$set": {"password_hash": password_hash}})
+        self._users.update_one(
+            {"username": username.lower()}, {"$set": {"password_hash": password_hash}}
+        )
 
     @instrument("user_store_delete_user")
     def delete_user(self, username: str) -> None:
@@ -103,7 +109,9 @@ class UserStore:
     def update_user_type(self, username: str, user_type: str) -> None:
         """Update a user's role."""
 
-        self._users.update_one({"username": username.lower()}, {"$set": {"user_type": user_type}})
+        self._users.update_one(
+            {"username": username.lower()}, {"$set": {"user_type": user_type}}
+        )
 
     @instrument("user_store_get_accounts")
     def get_accounts(self, username: str) -> list[dict[str, str]]:
@@ -118,7 +126,9 @@ class UserStore:
     def save_accounts(self, username: str, accounts: list[dict[str, str]]) -> None:
         """Persist a user's accounts."""
 
-        self._users.update_one({"username": username.lower()}, {"$set": {"accounts": accounts}})
+        self._users.update_one(
+            {"username": username.lower()}, {"$set": {"accounts": accounts}}
+        )
 
     @instrument("user_store_has_accounts")
     def has_accounts(self, username: str) -> bool:
@@ -143,7 +153,9 @@ class UserStore:
         """Return admin-managed option values."""
 
         self._seed_option_defaults(category)
-        records = list(self._settings.find({"category": category}, {"_id": 0}).sort("value", 1))
+        records = list(
+            self._settings.find({"category": category}, {"_id": 0}).sort("value", 1)
+        )
         return [record["value"] for record in records]
 
     @instrument("user_store_add_option")
@@ -192,15 +204,24 @@ class UserStore:
         if self._settings.find_one({"category": category}, {"_id": 1}) is not None:
             return
 
-        defaults = DEFAULT_ACCOUNT_TYPES if category == "account_types" else DEFAULT_ALLIANCES
-        self._settings.insert_many([{"category": category, "value": value} for value in defaults])
+        defaults = (
+            DEFAULT_ACCOUNT_TYPES if category == "account_types" else DEFAULT_ALLIANCES
+        )
+        self._settings.insert_many(
+            [{"category": category, "value": value} for value in defaults]
+        )
 
     @instrument("user_store_replace_account_option")
-    def _replace_account_option(self, category: str, original_value: str, new_value: str) -> None:
+    def _replace_account_option(
+        self, category: str, original_value: str, new_value: str
+    ) -> None:
         """Propagate renamed account options into embedded account records."""
 
         field_name = "account_type" if category == "account_types" else "alliance"
-        users = self._users.find({f"accounts.{field_name}": original_value}, {"_id": 0, "username": 1, "accounts": 1})
+        users = self._users.find(
+            {f"accounts.{field_name}": original_value},
+            {"_id": 0, "username": 1, "accounts": 1},
+        )
         for user in users:
             updated_accounts = []
             for account in user.get("accounts", []):
@@ -245,15 +266,23 @@ def ensure_indexes(
         users_collection.create_index("username", unique=True)
         settings_collection.create_index([("category", 1), ("value", 1)], unique=True)
     except PyMongoError as error:
-        logger.warning("Could not create MongoDB indexes during startup for %s: %s", mongo_uri, error)
+        logger.warning(
+            "Could not create MongoDB indexes during startup for %s: %s",
+            mongo_uri,
+            error,
+        )
 
 
 @instrument("verify_connection")
-def verify_connection(client: MongoClient, mongo_uri: str, logger: logging.Logger) -> None:
+def verify_connection(
+    client: MongoClient, mongo_uri: str, logger: logging.Logger
+) -> None:
     """Log MongoDB connectivity status during startup."""
 
     try:
         client.admin.command("ping")
         logger.info("Connected to MongoDB at %s", mongo_uri)
     except PyMongoError as error:
-        logger.warning("Could not connect to MongoDB at %s during startup: %s", mongo_uri, error)
+        logger.warning(
+            "Could not connect to MongoDB at %s during startup: %s", mongo_uri, error
+        )

@@ -131,7 +131,9 @@ def test_language_change_refreshes_public_pages_in_selected_language(
     assert "Parametres de langue" in content
 
 
-def test_language_change_refreshes_create_account_page_in_selected_language(client) -> None:
+def test_language_change_refreshes_create_account_page_in_selected_language(
+    client,
+) -> None:
     complete_access_code(client)
     content = change_language(client, "/create-account")
 
@@ -268,7 +270,11 @@ def test_alliance_users_page_search_and_filters(client, app) -> None:
     user_store.save_accounts(
         "Eviseration",
         [
-            {"account_name": "Baby Vis Doot Doot", "account_type": "Farm", "alliance": "R&S"},
+            {
+                "account_name": "Baby Vis Doot Doot",
+                "account_type": "Farm",
+                "alliance": "R&S",
+            },
             {"account_name": "The Vis", "account_type": "Secondary", "alliance": "TNO"},
             {"account_name": "Vis kid", "account_type": "Farm", "alliance": "R&S"},
             {"account_name": "Eviseration", "account_type": "Main", "alliance": "R&S"},
@@ -305,5 +311,9 @@ def test_alliance_users_page_search_and_filters(client, app) -> None:
     assert main_index < secondary_index < baby_farm_index < vis_kid_index
     assert "AnotherUser | Other" not in content
 
-    filtered = client.get("/alliance-users?search=Vis+kid&account_type=Farm&alliance=TNO")
-    assert "No users matched the current search and filters." in filtered.get_data(as_text=True)
+    filtered = client.get(
+        "/alliance-users?search=Vis+kid&account_type=Farm&alliance=TNO"
+    )
+    assert "No users matched the current search and filters." in filtered.get_data(
+        as_text=True
+    )
