@@ -101,7 +101,9 @@ def save_json(path: Path, payload: dict[str, str]) -> None:
     )
 
 
-def choose_targets(requested_targets: list[str] | None, language_names: dict[str, str]) -> list[str]:
+def choose_targets(
+    requested_targets: list[str] | None, language_names: dict[str, str]
+) -> list[str]:
     """Choose which language files to update."""
 
     valid_targets = [code for code in language_names if code != "en"]
@@ -114,7 +116,9 @@ def choose_targets(requested_targets: list[str] | None, language_names: dict[str
     return [code for code in requested_targets if code != "en"]
 
 
-def build_prompt(source_strings: dict[str, str], target_code: str, target_name: str) -> str:
+def build_prompt(
+    source_strings: dict[str, str], target_code: str, target_name: str
+) -> str:
     """Build a strict translation prompt for Ollama."""
 
     return (
@@ -159,18 +163,23 @@ def request_translation(
         method="POST",
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        # The local CLI intentionally supports a configured Ollama endpoint.
+        with urlopen(request, timeout=timeout) as response:  # nosec B310
             body = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         raise SystemExit(f"Ollama request failed with HTTP {error.code}") from error
     except URLError as error:
-        raise SystemExit(f"Unable to reach Ollama at {ollama_url}: {error.reason}") from error
+        raise SystemExit(
+            f"Unable to reach Ollama at {ollama_url}: {error.reason}"
+        ) from error
 
     raw_response = body.get("response", "")
     try:
         translated = json.loads(raw_response)
     except json.JSONDecodeError as error:
-        raise SystemExit("Ollama returned invalid JSON. Try a stronger model or rerun with --force.") from error
+        raise SystemExit(
+            "Ollama returned invalid JSON. Try a stronger model or rerun with --force."
+        ) from error
 
     if set(translated) != set(source_strings):
         missing = sorted(set(source_strings) - set(translated))
@@ -180,7 +189,9 @@ def request_translation(
             details.append(f"missing keys: {', '.join(missing)}")
         if extra:
             details.append(f"extra keys: {', '.join(extra)}")
-        raise SystemExit(f"Ollama returned an invalid translation payload ({'; '.join(details)}).")
+        raise SystemExit(
+            f"Ollama returned an invalid translation payload ({'; '.join(details)})."
+        )
 
     return {key: str(value) for key, value in translated.items()}
 
@@ -199,9 +210,15 @@ def main() -> int:
     for target_code in targets:
         target_path = I18N_DIR / f"{target_code}.json"
         existing_strings = load_json(target_path) if target_path.exists() else {}
-        source_subset = english_strings if args.force else {
-            key: value for key, value in english_strings.items() if key not in existing_strings
-        }
+        source_subset = (
+            english_strings
+            if args.force
+            else {
+                key: value
+                for key, value in english_strings.items()
+                if key not in existing_strings
+            }
+        )
         if not source_subset:
             print(f"{target_code}: no missing keys")
             continue
@@ -220,11 +237,17 @@ def main() -> int:
 
         if args.dry_run:
             print(f"--- {target_code}")
-            print(json.dumps(translated_subset, indent=2, ensure_ascii=True, sort_keys=True))
+            print(
+                json.dumps(
+                    translated_subset, indent=2, ensure_ascii=True, sort_keys=True
+                )
+            )
             continue
 
         save_json(target_path, merged_strings)
-        print(f"{target_code}: wrote {len(translated_subset)} key(s) to {target_path.relative_to(REPO_ROOT)}")
+        print(
+            f"{target_code}: wrote {len(translated_subset)} key(s) to {target_path.relative_to(REPO_ROOT)}"
+        )
 
     return 0
 

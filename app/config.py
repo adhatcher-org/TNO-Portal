@@ -19,11 +19,15 @@ class Config:
     MONGO_URI = os.getenv("MONGO_URI", "mongodb://192.168.215.2:27017/")
     MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "TNO-MongoDB")
     MONGO_COLLECTION_NAME = os.getenv("MONGO_COLLECTION_NAME", "users")
-    MONGO_SERVER_SELECTION_TIMEOUT_MS = int(os.getenv("MONGO_SERVER_SELECTION_TIMEOUT_MS", "2000"))
+    MONGO_SERVER_SELECTION_TIMEOUT_MS = int(
+        os.getenv("MONGO_SERVER_SELECTION_TIMEOUT_MS", "2000")
+    )
     MONGO_CLIENT_FACTORY = None
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    SESSION_COOKIE_SECURE = (
+        os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    )
     PERMANENT_SESSION_LIFETIME = timedelta(days=365)
     SUPPORTED_LANGUAGES = ("en", "fr", "es", "ru", "pt", "de")
     INVITE_CODE = "TNO"

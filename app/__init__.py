@@ -6,12 +6,35 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
-from flask import Flask, Response, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import (
+    Flask,
+    Response,
+    flash,
+    g,
+    jsonify,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from app.config import Config
 from app.instrumentation import instrument, render_metrics
-from app.security import get_csrf_token, hash_password, validate_csrf, validate_password, verify_password
-from app.storage import DEFAULT_ALLIANCES, DEFAULT_ACCOUNT_TYPES, UserStore, create_user_store
+from app.security import (
+    get_csrf_token,
+    hash_password,
+    validate_csrf,
+    validate_password,
+    verify_password,
+)
+from app.storage import (
+    DEFAULT_ALLIANCES,
+    DEFAULT_ACCOUNT_TYPES,
+    UserStore,
+    create_user_store,
+)
 from app.translations import LANGUAGE_NAMES, TRANSLATIONS
 
 ACCOUNT_TYPE_SORT_ORDER = {"Main": 0, "Secondary": 1, "Farm": 2}
@@ -30,7 +53,9 @@ LANGUAGE_RETURN_ENDPOINTS = {
 }
 
 
-def normalize_language(language: str | None, supported_languages: tuple[str, ...]) -> str:
+def normalize_language(
+    language: str | None, supported_languages: tuple[str, ...]
+) -> str:
     """Return a supported language code or the safe default."""
 
     if language in supported_languages:
@@ -67,7 +92,9 @@ def configure_logging(app: Flask) -> None:
         return
 
     logger.setLevel(logging.INFO)
-    handler = RotatingFileHandler(app.config["LOG_PATH"], maxBytes=1_000_000, backupCount=3)
+    handler = RotatingFileHandler(
+        app.config["LOG_PATH"], maxBytes=1_000_000, backupCount=3
+    )
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
@@ -160,7 +187,11 @@ def register_routes(app: Flask) -> None:
                 session["current_user"] = user["username"]
                 destination = determine_post_login_route(user_store, user)
                 response = make_response(redirect(url_for(destination)))
-                set_user_preferences(app, user.get("preferred_language") or g.language, user["display_name"])
+                set_user_preferences(
+                    app,
+                    user.get("preferred_language") or g.language,
+                    user["display_name"],
+                )
                 flash(g.translations["sign_in_cta"], "success")
                 return response
         return render_template("login.html")
@@ -236,7 +267,9 @@ def register_routes(app: Flask) -> None:
                 if not first_name:
                     flash(g.translations["first_name_required"], "error")
                 else:
-                    preferred_language = request.form.get("preferred_language", "").strip()
+                    preferred_language = request.form.get(
+                        "preferred_language", ""
+                    ).strip()
                     user_store.update_profile(
                         current_user["username"],
                         first_name,
@@ -256,7 +289,9 @@ def register_routes(app: Flask) -> None:
                 new_password = request.form.get("new_password", "")
                 confirm_password = request.form.get("confirm_new_password", "")
                 if validate_password(new_password) and new_password == confirm_password:
-                    user_store.update_password(current_user["username"], hash_password(new_password))
+                    user_store.update_password(
+                        current_user["username"], hash_password(new_password)
+                    )
                     flash(g.translations["password_reset_success"], "success")
                     return redirect(url_for("user_info"))
                 flash(g.translations["password_false"], "error")
@@ -292,7 +327,11 @@ def register_routes(app: Flask) -> None:
         alliances = user_store.get_options("alliances")
         accounts_data = user_store.get_accounts(current_user["username"])
         if not accounts_data:
-            accounts_data = [build_default_account_row(current_user["display_name"], account_types, alliances)]
+            accounts_data = [
+                build_default_account_row(
+                    current_user["display_name"], account_types, alliances
+                )
+            ]
 
         if request.method == "POST":
             if not validate_csrf(request.form.get("csrf_token")):
@@ -305,13 +344,25 @@ def register_routes(app: Flask) -> None:
                 flash(g.translations[error_message], "error")
             else:
                 if action == "delete":
-                    selected_indexes = {int(index) for index in request.form.getlist("selected_rows")}
-                    accounts_data = [row for index, row in enumerate(accounts_data) if index not in selected_indexes]
+                    selected_indexes = {
+                        int(index) for index in request.form.getlist("selected_rows")
+                    }
+                    accounts_data = [
+                        row
+                        for index, row in enumerate(accounts_data)
+                        if index not in selected_indexes
+                    ]
                     if not accounts_data:
-                        accounts_data = [build_default_account_row(current_user["display_name"], account_types, alliances)]
+                        accounts_data = [
+                            build_default_account_row(
+                                current_user["display_name"], account_types, alliances
+                            )
+                        ]
                 elif action == "add":
                     user_store.save_accounts(current_user["username"], accounts_data)
-                    accounts_data.append(build_default_account_row("", account_types, alliances))
+                    accounts_data.append(
+                        build_default_account_row("", account_types, alliances)
+                    )
                     flash(g.translations["accounts_saved"], "success")
                     return render_template(
                         "accounts.html",
@@ -371,7 +422,9 @@ def register_routes(app: Flask) -> None:
         admin_user = require_admin(user_store)
         if isinstance(admin_user, Response):
             return admin_user
-        return handle_option_maintenance(user_store, "account_types", "admin_account_types", "account_type")
+        return handle_option_maintenance(
+            user_store, "account_types", "admin_account_types", "account_type"
+        )
 
     @app.route("/admin/alliances", methods=["GET", "POST"])
     @instrument("admin_alliances")
@@ -379,7 +432,9 @@ def register_routes(app: Flask) -> None:
         admin_user = require_admin(user_store)
         if isinstance(admin_user, Response):
             return admin_user
-        return handle_option_maintenance(user_store, "alliances", "admin_alliances", "alliance")
+        return handle_option_maintenance(
+            user_store, "alliances", "admin_alliances", "alliance"
+        )
 
     @app.route("/admin/users", methods=["GET", "POST"])
     @instrument("admin_users")
@@ -434,7 +489,9 @@ def register_routes(app: Flask) -> None:
                 current_user.get("email", ""),
                 language,
             )
-        endpoint = LANGUAGE_RETURN_ENDPOINTS.get(request.form.get("next_path"), "welcome")
+        endpoint = LANGUAGE_RETURN_ENDPOINTS.get(
+            request.form.get("next_path"), "welcome"
+        )
         response = make_response(redirect(url_for(endpoint)))
         set_user_preferences(app, language)
         return response
@@ -461,7 +518,11 @@ def handle_option_maintenance(
         if action == "add":
             user_store.add_option(category, request.form.get("value", ""))
         elif action == "update":
-            user_store.update_option(category, request.form.get("original_value", ""), request.form.get("value", ""))
+            user_store.update_option(
+                category,
+                request.form.get("original_value", ""),
+                request.form.get("value", ""),
+            )
         elif action == "delete":
             user_store.delete_option(category, request.form.get("original_value", ""))
         flash(g.translations["admin_options_saved"], "success")
@@ -469,7 +530,9 @@ def handle_option_maintenance(
 
     items = user_store.get_options(category)
     template_name = "option_maintenance.html"
-    return render_template(template_name, items=items, category=category, entity_label=entity_label)
+    return render_template(
+        template_name, items=items, category=category, entity_label=entity_label
+    )
 
 
 @instrument("require_login")
@@ -573,13 +636,18 @@ def filter_alliance_users(
     filtered_users = []
     for user in sorted(users, key=lambda item: item["username"]):
         accounts = sort_accounts(user.get("accounts", []))
-        if normalized_search and not user_or_accounts_match(user, accounts, normalized_search):
+        if normalized_search and not user_or_accounts_match(
+            user, accounts, normalized_search
+        ):
             continue
 
         filtered_accounts = [
             account
             for account in accounts
-            if (account_type_filter == "All" or account.get("account_type") == account_type_filter)
+            if (
+                account_type_filter == "All"
+                or account.get("account_type") == account_type_filter
+            )
             and (alliance_filter == "All" or account.get("alliance") == alliance_filter)
         ]
         if filtered_accounts:
@@ -594,7 +662,9 @@ def filter_alliance_users(
 
 
 @instrument("user_or_accounts_match")
-def user_or_accounts_match(user: dict[str, Any], accounts: list[dict[str, str]], search_term: str) -> bool:
+def user_or_accounts_match(
+    user: dict[str, Any], accounts: list[dict[str, str]], search_term: str
+) -> bool:
     """Return True when the user or any account matches the search term."""
 
     haystacks = [user.get("display_name", ""), user.get("username", "")]
@@ -619,17 +689,32 @@ def sort_accounts(accounts: list[dict[str, str]]) -> list[dict[str, str]]:
 def build_account_columns(accounts: list[dict[str, str]]) -> list[dict[str, str]]:
     """Build display columns for the alliance user account table."""
 
-    main_accounts = [account for account in accounts if account.get("account_type") == "Main"]
-    secondary_accounts = [account for account in accounts if account.get("account_type") == "Secondary"]
-    farm_accounts = [account for account in accounts if account.get("account_type") == "Farm"]
+    main_accounts = [
+        account for account in accounts if account.get("account_type") == "Main"
+    ]
+    secondary_accounts = [
+        account for account in accounts if account.get("account_type") == "Secondary"
+    ]
+    farm_accounts = [
+        account for account in accounts if account.get("account_type") == "Farm"
+    ]
 
     columns = []
     if main_accounts:
-        columns.append({"header": "Main", "value": format_account_display(main_accounts[0])})
+        columns.append(
+            {"header": "Main", "value": format_account_display(main_accounts[0])}
+        )
     if secondary_accounts:
-        columns.append({"header": "Secondary", "value": format_account_display(secondary_accounts[0])})
+        columns.append(
+            {
+                "header": "Secondary",
+                "value": format_account_display(secondary_accounts[0]),
+            }
+        )
     for index, account in enumerate(farm_accounts, start=1):
-        columns.append({"header": f"Farm{index}", "value": format_account_display(account)})
+        columns.append(
+            {"header": f"Farm{index}", "value": format_account_display(account)}
+        )
     return columns
 
 
@@ -641,10 +726,14 @@ def format_account_display(account: dict[str, str]) -> str:
 
 
 @instrument("set_user_preferences")
-def set_user_preferences(app: Flask, language: str, username: str | None = None) -> None:
+def set_user_preferences(
+    app: Flask, language: str, username: str | None = None
+) -> None:
     """Store validated preferences in Flask's signed, persistent session."""
 
     session.permanent = True
-    session["language"] = normalize_language(language, app.config["SUPPORTED_LANGUAGES"])
+    session["language"] = normalize_language(
+        language, app.config["SUPPORTED_LANGUAGES"]
+    )
     if username:
         session["remembered_user"] = username

@@ -48,6 +48,13 @@ Run tests:
 make test
 ```
 
+Run the complete non-mutating validation gate (format, lint, tests, coverage,
+security audit, and lockfile verification):
+
+```bash
+make check
+```
+
 Run local translation sync through Ollama, then tests:
 
 ```bash

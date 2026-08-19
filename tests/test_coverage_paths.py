@@ -34,7 +34,9 @@ def test_create_account_validation_and_login_failures(client) -> None:
     access_page = client.get("/create-account-access")
     csrf_token = extract_csrf_token(access_page.get_data(as_text=True))
 
-    invalid_csrf = client.post("/create-account-access", data={"access_code": "TNO", "csrf_token": "bad"})
+    invalid_csrf = client.post(
+        "/create-account-access", data={"access_code": "TNO", "csrf_token": "bad"}
+    )
     assert invalid_csrf.status_code == 400
 
     wrong_code = client.post(
@@ -81,7 +83,11 @@ def test_create_account_validation_and_login_failures(client) -> None:
     create_user(client, "TakenCase")
     access_page = client.get("/create-account-access")
     csrf_token = extract_csrf_token(access_page.get_data(as_text=True))
-    client.post("/create-account-access", data={"access_code": "TNO", "csrf_token": csrf_token}, follow_redirects=True)
+    client.post(
+        "/create-account-access",
+        data={"access_code": "TNO", "csrf_token": csrf_token},
+        follow_redirects=True,
+    )
     signup_page = client.get("/create-account")
     signup_csrf = extract_csrf_token(signup_page.get_data(as_text=True))
     taken = client.post(
@@ -123,7 +129,12 @@ def test_user_info_reset_password_and_delete_paths(client, app) -> None:
 
     first_name_required = client.post(
         "/user-info",
-        data={"csrf_token": csrf_token, "action": "save_info", "first_name": "", "preferred_language": "en"},
+        data={
+            "csrf_token": csrf_token,
+            "action": "save_info",
+            "first_name": "",
+            "preferred_language": "en",
+        },
         follow_redirects=True,
     )
     assert "First name is required." in first_name_required.get_data(as_text=True)
@@ -164,7 +175,9 @@ def test_user_info_reset_password_and_delete_paths(client, app) -> None:
         data={"csrf_token": csrf_token, "action": "delete_user"},
         follow_redirects=True,
     )
-    assert "only available when no accounts exist" in blocked_delete.get_data(as_text=True)
+    assert "only available when no accounts exist" in blocked_delete.get_data(
+        as_text=True
+    )
 
     app.config["USER_STORE"].save_accounts("DeleteMe", [])
     user_info_page = client.get("/user-info")
@@ -209,7 +222,9 @@ def test_accounts_form_branches_and_admin_crud(client, app) -> None:
         },
         follow_redirects=True,
     )
-    assert "Only one account can be marked as Main." in duplicate_main.get_data(as_text=True)
+    assert "Only one account can be marked as Main." in duplicate_main.get_data(
+        as_text=True
+    )
 
     add_row = client.post(
         "/accounts",
@@ -256,7 +271,12 @@ def test_accounts_form_branches_and_admin_crud(client, app) -> None:
     )
     updated = client.post(
         "/admin/account-types",
-        data={"csrf_token": admin_csrf, "action": "update", "original_value": "Alt", "value": "Alt2"},
+        data={
+            "csrf_token": admin_csrf,
+            "action": "update",
+            "original_value": "Alt",
+            "value": "Alt2",
+        },
         follow_redirects=True,
     )
     assert "Admin options have been saved." in updated.get_data(as_text=True)
@@ -287,7 +307,9 @@ def test_accounts_form_branches_and_admin_crud(client, app) -> None:
         },
         follow_redirects=True,
     )
-    assert "User administration changes have been saved." in save_types.get_data(as_text=True)
+    assert "User administration changes have been saved." in save_types.get_data(
+        as_text=True
+    )
 
     delete_users = client.post(
         "/admin/users",
@@ -300,7 +322,9 @@ def test_accounts_form_branches_and_admin_crud(client, app) -> None:
         },
         follow_redirects=True,
     )
-    assert "User administration changes have been saved." in delete_users.get_data(as_text=True)
+    assert "User administration changes have been saved." in delete_users.get_data(
+        as_text=True
+    )
 
 
 def test_helper_functions_and_require_guards(app) -> None:
@@ -355,7 +379,12 @@ def test_helper_functions_and_require_guards(app) -> None:
     )
     assert parsed == [{"account_name": "A", "account_type": "Main", "alliance": "TNO"}]
     assert validate_accounts([]) is None
-    assert validate_accounts([{"account_name": "", "account_type": "Main", "alliance": "TNO"}]) == "account_name_required"
+    assert (
+        validate_accounts(
+            [{"account_name": "", "account_type": "Main", "alliance": "TNO"}]
+        )
+        == "account_name_required"
+    )
     assert (
         validate_accounts(
             [
@@ -373,12 +402,29 @@ def test_helper_functions_and_require_guards(app) -> None:
             {"account_name": "farm a", "account_type": "Farm", "alliance": "TNO"},
         ]
     )
-    assert [item["account_name"] for item in accounts] == ["main", "sec", "farm a", "farm b"]
-    assert user_or_accounts_match({"display_name": "HelperUser", "username": "helperuser"}, accounts, "farm a")
-    assert not user_or_accounts_match({"display_name": "HelperUser", "username": "helperuser"}, accounts, "missing")
+    assert [item["account_name"] for item in accounts] == [
+        "main",
+        "sec",
+        "farm a",
+        "farm b",
+    ]
+    assert user_or_accounts_match(
+        {"display_name": "HelperUser", "username": "helperuser"}, accounts, "farm a"
+    )
+    assert not user_or_accounts_match(
+        {"display_name": "HelperUser", "username": "helperuser"}, accounts, "missing"
+    )
     columns = build_account_columns(accounts)
-    assert [column["header"] for column in columns] == ["Main", "Secondary", "Farm1", "Farm2"]
-    assert format_account_display({"account_name": "main", "alliance": "TCF"}) == "main (TCF)"
+    assert [column["header"] for column in columns] == [
+        "Main",
+        "Secondary",
+        "Farm1",
+        "Farm2",
+    ]
+    assert (
+        format_account_display({"account_name": "main", "alliance": "TCF"})
+        == "main (TCF)"
+    )
     filtered = filter_alliance_users(
         [
             {
@@ -394,7 +440,9 @@ def test_helper_functions_and_require_guards(app) -> None:
         "TNO",
         "farm",
     )
-    assert filtered[0]["account_columns"] == [{"header": "Farm1", "value": "farm a (TNO)"}]
+    assert filtered[0]["account_columns"] == [
+        {"header": "Farm1", "value": "farm a (TNO)"}
+    ]
 
 
 def test_storage_methods_and_index_helpers(app) -> None:
@@ -406,10 +454,17 @@ def test_storage_methods_and_index_helpers(app) -> None:
     assert store.get_accounts("Missing") == []
     assert not store.has_profile_data("Missing")
     store.update_password("StorageUser", "hash2")
-    store.save_accounts("StorageUser", [{"account_name": "One", "account_type": "Main", "alliance": "TNO"}])
+    store.save_accounts(
+        "StorageUser",
+        [{"account_name": "One", "account_type": "Main", "alliance": "TNO"}],
+    )
     assert store.has_accounts("StorageUser")
     store.update_user_type("StorageUser", "Admin")
-    assert any(user["user_type"] == "Admin" for user in store.list_users() if user["username"] == "storageuser")
+    assert any(
+        user["user_type"] == "Admin"
+        for user in store.list_users()
+        if user["username"] == "storageuser"
+    )
     store.add_option("account_types", "Scout")
     assert "Scout" in store.get_options("account_types")
     store.add_option("account_types", "   ")
@@ -417,7 +472,10 @@ def test_storage_methods_and_index_helpers(app) -> None:
     assert "Scout+" in store.get_options("account_types")
     store.update_option("account_types", "Scout+", "   ")
     store.delete_option("account_types", "Scout+")
-    store.save_accounts("StorageUser", [{"account_name": "One", "account_type": "Main", "alliance": "TNO"}])
+    store.save_accounts(
+        "StorageUser",
+        [{"account_name": "One", "account_type": "Main", "alliance": "TNO"}],
+    )
     store.add_option("alliances", "Guild")
     store.update_option("alliances", "TNO", "TNOX")
     assert store.get_accounts("StorageUser")[0]["alliance"] == "TNOX"
@@ -460,7 +518,9 @@ def test_handle_option_maintenance_and_instrumentation_exception(app) -> None:
         g.csrf_token = "token"
         g.current_user = None
         g.is_admin = False
-        response = handle_option_maintenance(store, "account_types", "admin_account_types", "account_type")
+        response = handle_option_maintenance(
+            store, "account_types", "admin_account_types", "account_type"
+        )
         assert "Maintenance for" in response
 
     with app.test_request_context(
@@ -468,7 +528,9 @@ def test_handle_option_maintenance_and_instrumentation_exception(app) -> None:
         method="POST",
         data={"csrf_token": "bad", "action": "add", "value": "X"},
     ):
-        response = handle_option_maintenance(store, "account_types", "admin_account_types", "account_type")
+        response = handle_option_maintenance(
+            store, "account_types", "admin_account_types", "account_type"
+        )
         assert response.status_code == 400
 
     @instrument("boom")

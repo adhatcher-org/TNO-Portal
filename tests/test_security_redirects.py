@@ -35,7 +35,14 @@ def test_language_preference_allows_known_return_paths(client) -> None:
     page = client.get("/")
     csrf_token = extract_csrf_token(page.get_data(as_text=True))
 
-    for next_path in ("/", "/login", "/create-account-access", "/create-account", "/user-info", "/accounts"):
+    for next_path in (
+        "/",
+        "/login",
+        "/create-account-access",
+        "/create-account",
+        "/user-info",
+        "/accounts",
+    ):
         response = client.post(
             "/preferences/language",
             data={"language": "fr", "csrf_token": csrf_token, "next_path": next_path},
